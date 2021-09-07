@@ -22,6 +22,7 @@ import {
 } from '../../services/IdentityService';
 import { getGeeTestToken } from '../../utils/geeTest';
 import { analytics } from '../../utils/analytics';
+import { Enable2FaComponent } from '../../components/Enable2FA/Enable2FA';
 
 type LoginStateType =
     | 'sign-up'
@@ -29,7 +30,8 @@ type LoginStateType =
     | 'confirm-sign-up'
     | 'confirm-sign-in'
     | 'forgot-password'
-    | 'success-sign-up';
+    | 'success-sign-up'
+    | 'enable-2fa';
 
 type LoginProps = {
     identity: IdentityService;
@@ -37,18 +39,42 @@ type LoginProps = {
     onCancel(): void;
 };
 
+const day = 1000 * 60 * 60 * 24;
+
 export const Login: FC<LoginProps> = ({ identity, onConfirm, onCancel }) => {
     const [loginState, setLoginState] = useState<LoginStateType>('sign-in');
     const [codeDelivery, setCodeDelivery] = useState<CodeDelivery>();
+    const [is2FAEnabled, setIs2FAEnabled] = useState(false);
     const userData = useRef<{ username: string; password: string }>();
 
     const handleSuccess = useCallback(() => {
+        const enable2FATimestamp = Number(
+            localStorage.getItem('enable2FATimestamp')
+        );
+
+        if (
+            !is2FAEnabled &&
+            (!enable2FATimestamp || Date.now() - enable2FATimestamp >= day)
+        ) {
+            setLoginState('enable-2fa');
+            localStorage.setItem('enable2FATimestamp', Date.now().toString());
+
+            return;
+        }
         analytics.send({ name: 'Login_Page_SignIn_Success' });
         onConfirm({
             address: identity.getUserAddress(),
             publicKey: identity.getUserPublicKey(),
         });
-    }, [identity, onConfirm]);
+    }, [identity, is2FAEnabled, onConfirm]);
+
+    const onCloseClick = useCallback(() => {
+        if (loginState === 'enable-2fa') {
+            handleSuccess();
+        } else {
+            onCancel();
+        }
+    }, [handleSuccess, loginState, onCancel]);
 
     const resendSignUp = useCallback(async (): Promise<void> => {
         const result = await identity.resendSignUp();
@@ -78,6 +104,7 @@ export const Login: FC<LoginProps> = ({ identity, onConfirm, onCancel }) => {
                         // TODO ???
                         setCodeDelivery({ type: 'SMS', destination: '' });
                         setLoginState('confirm-sign-in');
+                        setIs2FAEnabled(true);
                         break;
                     case 'SOFTWARE_TOKEN_MFA':
                         setCodeDelivery({
@@ -85,6 +112,7 @@ export const Login: FC<LoginProps> = ({ identity, onConfirm, onCancel }) => {
                             destination: 'TOTP device',
                         });
                         setLoginState('confirm-sign-in');
+                        setIs2FAEnabled(true);
                         break;
                     default:
                         handleSuccess();
@@ -221,6 +249,9 @@ export const Login: FC<LoginProps> = ({ identity, onConfirm, onCancel }) => {
                     {loginState === 'confirm-sign-in' && (
                         <Text ml="10px">Verify Your Account</Text>
                     )}
+                    {loginState === 'enable-2fa' && (
+                        <Text ml="10px">Enable 2FA</Text>
+                    )}
                 </Text>
                 {(loginState === 'confirm-sign-up' ||
                     loginState === 'confirm-sign-in') && (
@@ -254,7 +285,7 @@ export const Login: FC<LoginProps> = ({ identity, onConfirm, onCancel }) => {
                     size={25}
                     color="basic.$700"
                     _hover={{ color: 'basic.$500' }}
-                    onClick={onCancel}
+                    onClick={onCloseClick}
                 >
                     <Icon icon={iconClose} />
                 </IconButton>
@@ -308,13 +339,10 @@ export const Login: FC<LoginProps> = ({ identity, onConfirm, onCancel }) => {
                 />
             )}
 
-            {loginState === 'forgot-password' && (
-                <ForgotPassword
-                    onSignInClick={(): void => {
-                        setLoginState('sign-in');
-                    }}
-                    onSignUpClick={(): void => {
-                        setLoginState('sign-up');
+            {loginState === 'enable-2fa' && (
+                <Enable2FaComponent
+                    onClose={() => {
+                        handleSuccess();
                     }}
                 />
             )}
@@ -322,7 +350,8 @@ export const Login: FC<LoginProps> = ({ identity, onConfirm, onCancel }) => {
             {loginState === 'confirm-sign-up' ||
             loginState === 'confirm-sign-in' ||
             loginState === 'success-sign-up' ||
-            loginState === 'forgot-password' ? null : (
+            loginState === 'forgot-password' ||
+            loginState === 'enable-2fa' ? null : (
                 <Box pb="32px" textAlign="center" fontWeight={300}>
                     <Text variant="footnote1" color="basic.$500">
                         Waves.Exchange
