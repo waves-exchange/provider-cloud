@@ -1,12 +1,21 @@
 const w = window as any;
 
 export const getGeeTestToken = (
-    geetestUrl: string
+    geetestUrl: string,
+    useCaptcha = true
 ): Promise<{
     geetest_challenge: string;
     geetest_seccode: string;
     geetest_validate: string;
 }> => {
+    if (!useCaptcha) {
+        return Promise.resolve({
+            geetest_challenge: '',
+            geetest_seccode: '',
+            geetest_validate: '',
+        });
+    }
+
     // eslint-disable-next-line no-async-promise-executor
     return new Promise(async (res, rej) => {
         try {

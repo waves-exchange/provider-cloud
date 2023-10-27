@@ -1,14 +1,17 @@
-import { seedUtils, libs } from '@waves/waves-transactions';
+import { libs, seedUtils } from '@waves/waves-transactions';
+
+// eslint-disable-next-line sort-imports
 import {
     AuthenticationDetails,
-    CognitoIdToken,
     CodeDeliveryDetails,
-    ISignUpResult,
+    CognitoIdToken,
     CognitoUser,
-    CognitoUserPool,
     CognitoUserAttribute,
+    CognitoUserPool,
     ICognitoStorage,
+    ISignUpResult,
 } from 'amazon-cognito-identity-js';
+
 import { MemoryStorage } from './MemoryStorage';
 
 type IdentityUser = {
@@ -39,10 +42,16 @@ type IdentityServiceOptions = {
     clientId: string;
     endpoint: string;
     geetestUrl: string;
+    disableCaptcha?: boolean;
+};
+
+const USER = {
+    CHALLENGE: { NAME: 'challengeName', PARAM: 'challengeParam' },
 };
 
 export class IdentityService {
     public geetestUrl = '';
+    public isUseCaptcha = false;
     private readonly storage: ICognitoStorage = new MemoryStorage();
     private userPool: CognitoUserPool | undefined = undefined;
     private currentUser: CognitoUser | undefined = undefined;
@@ -57,8 +66,12 @@ export class IdentityService {
         userPoolId,
         endpoint,
         geetestUrl,
+        disableCaptcha,
     }: IdentityServiceOptions): void {
         this.apiUrl = apiUrl;
+
+        this.isUseCaptcha =
+            disableCaptcha == null ? this.isUseCaptcha : disableCaptcha;
 
         this.userPool = new CognitoUserPool({
             UserPoolId: userPoolId,
@@ -208,12 +221,10 @@ export class IdentityService {
                 }),
                 {
                     onSuccess: async () => {
-                        const identityUser = await this.fetchIdentityUser();
+                        this.identityUser = await this.fetchIdentityUser();
 
-                        this.identityUser = identityUser;
-
-                        delete user['challengeName'];
-                        delete user['challengeParam'];
+                        delete user[USER.CHALLENGE.NAME];
+                        delete user[USER.CHALLENGE.PARAM];
                         resolve(user);
                     },
 
@@ -221,39 +232,39 @@ export class IdentityService {
                         reject(err);
                     },
                     customChallenge: function (challengeParam) {
-                        user['challengeName'] = 'CUSTOM_CHALLENGE';
-                        user['challengeParam'] = challengeParam;
+                        user[USER.CHALLENGE.NAME] = 'CUSTOM_CHALLENGE';
+                        user[USER.CHALLENGE.PARAM] = challengeParam;
                         resolve(user);
                     },
                     mfaRequired: function (challengeName, challengeParam) {
-                        user['challengeName'] = challengeName;
-                        user['challengeParam'] = challengeParam;
+                        user[USER.CHALLENGE.NAME] = challengeName;
+                        user[USER.CHALLENGE.PARAM] = challengeParam;
                         resolve(user);
                     },
                     mfaSetup: function (challengeName, challengeParam) {
-                        user['challengeName'] = challengeName;
-                        user['challengeParam'] = challengeParam;
+                        user[USER.CHALLENGE.NAME] = challengeName;
+                        user[USER.CHALLENGE.PARAM] = challengeParam;
                         resolve(user);
                     },
                     newPasswordRequired: function (
                         userAttributes,
                         requiredAttributes
                     ) {
-                        user['challengeName'] = 'NEW_PASSWORD_REQUIRED';
-                        user['challengeParam'] = {
+                        user[USER.CHALLENGE.NAME] = 'NEW_PASSWORD_REQUIRED';
+                        user[USER.CHALLENGE.PARAM] = {
                             userAttributes: userAttributes,
                             requiredAttributes: requiredAttributes,
                         };
                         resolve(user);
                     },
                     totpRequired: function (challengeName, challengeParam) {
-                        user['challengeName'] = challengeName;
-                        user['challengeParam'] = challengeParam;
+                        user[USER.CHALLENGE.NAME] = challengeName;
+                        user[USER.CHALLENGE.PARAM] = challengeParam;
                         resolve(user);
                     },
                     selectMFAType: function (challengeName, challengeParam) {
-                        user['challengeName'] = challengeName;
-                        user['challengeParam'] = challengeParam;
+                        user[USER.CHALLENGE.NAME] = challengeName;
+                        user[USER.CHALLENGE.PARAM] = challengeParam;
                         resolve(user);
                     },
                 }
@@ -272,15 +283,12 @@ export class IdentityService {
                 {
                     onSuccess: async (session) => {
                         if (this.currentUser) {
-                            delete this.currentUser['challengeName'];
-                            delete this.currentUser['challengeParam'];
+                            delete this.currentUser[USER.CHALLENGE.NAME];
+                            delete this.currentUser[USER.CHALLENGE.PARAM];
                         }
 
                         if (session && !this.identityUser) {
-                            const identityUser = await this.fetchIdentityUser();
-
-                            this.identityUser = identityUser;
-
+                            this.identityUser = await this.fetchIdentityUser();
                             resolve();
                         }
                     },
@@ -436,9 +444,8 @@ export class IdentityService {
                 Authorization: `Bearer ${token}`,
             },
         });
-        const identityUser: IdentityUser = await itentityUserResponse.json();
 
-        return identityUser;
+        return (await itentityUserResponse.json()) as IdentityUser;
     }
 
     private async signByIdentity(
@@ -454,9 +461,8 @@ export class IdentityService {
             },
             body: JSON.stringify(body),
         });
-        const result: IdentitySignTxResponse = await response.json();
 
-        return result;
+        return (await response.json()) as IdentitySignTxResponse;
     }
 }
 

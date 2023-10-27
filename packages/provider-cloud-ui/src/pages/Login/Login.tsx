@@ -3,12 +3,13 @@ import {
     Flex,
     Icon,
     IconButton,
+    Text,
     iconClose,
     iconExpandAccordion,
-    Text,
 } from '@waves.exchange/react-uikit';
 import React, { FC, useCallback, useEffect, useRef, useState } from 'react';
 import { IUser } from '../../interface';
+/* eslint-disable sort-imports */
 import { ForgotPassword } from '../../components/Auth/ForgotPassword';
 import { SignInForm } from '../../components/Auth/SignInForm';
 import { CodeConfirmation } from '../../components/Auth/CodeConfirmation';
@@ -41,6 +42,7 @@ type LoginProps = {
 
 const day = 1000 * 60 * 60 * 24;
 
+// eslint-disable-next-line complexity
 export const Login: FC<LoginProps> = ({
     identity,
     onConfirm,
@@ -104,7 +106,10 @@ export const Login: FC<LoginProps> = ({
     const signIn = useCallback(
         async (username: string, password: string): Promise<void> => {
             try {
-                const geeTest = await getGeeTestToken(identity.geetestUrl);
+                const geeTest = await getGeeTestToken(
+                    identity.geetestUrl,
+                    identity.isUseCaptcha
+                );
 
                 const cognitoUser = await identity.signIn(
                     username,
@@ -147,7 +152,10 @@ export const Login: FC<LoginProps> = ({
 
     const signUp = useCallback(
         async (username: string, password: string): Promise<SignUpResponse> => {
-            const geeTest = await getGeeTestToken(identity.geetestUrl);
+            const geeTest = await getGeeTestToken(
+                identity.geetestUrl,
+                identity.isUseCaptcha
+            );
             const result = await identity.signUp(username, password, geeTest);
 
             userData.current = {
