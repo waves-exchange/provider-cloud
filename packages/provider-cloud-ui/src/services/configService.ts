@@ -5,6 +5,7 @@ export type Config = {
             clientId: string;
             userPoolId: string;
             endpoint: string;
+            disableCaptcha?: string;
         };
         geetest: {
             url: string;
